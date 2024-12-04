@@ -1,13 +1,18 @@
 from langchain_community.vectorstores import FAISS
+from langchain_community.docstore.in_memory import InMemoryDocstore
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.schema import Document
+import faiss
+from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
+import numpy as np
 from sentence_transformers import SentenceTransformer
 import pytesseract
 from PIL import Image
 import fitz  # PyMuPDF
 import pandas as pd
-from docx import Document
 import subprocess
 import requests
 import json
@@ -49,7 +54,6 @@ def ollama_query(prompt, model="llama3.2", api_url="http://localhost:11434/api/g
         raise RuntimeError(f"Erreur lors de la requête à Ollama : {e}")
 
 
-
 class Document:
     def __init__(self, page_content, metadata):
         """
@@ -65,10 +69,10 @@ class Document:
 
 def load_documents(source, is_directory=False):
     """
-    Charge les documents PDF depuis un dossier ou des fichiers uploadés (drag-and-drop).
+    Charge les documents PDF depuis un dossier ou un fichier unique.
 
     Parameters:
-    - source (str | List[UploadedFile]): Chemin du dossier ou liste de fichiers uploadés.
+    - source (str | List[UploadedFile]): Chemin du dossier, chemin d'un fichier unique, ou liste de fichiers uploadés.
     - is_directory (bool): Indique si `source` est un dossier.
 
     Returns:
@@ -98,23 +102,38 @@ def load_documents(source, is_directory=False):
                 else:
                     print(f"Type de fichier non pris en charge : {file_path}")
     else:
-        # Charger depuis des fichiers uploadés (drag-and-drop)
-        for uploaded_file in source:
-            file_name = uploaded_file.name.lower()
-            file_extension = file_name.split(".")[-1]
+        # Vérifiez si source est une chaîne (fichier unique)
+        if isinstance(source, str):
+            file_path = source
+            file_extension = file_path.split(".")[-1].lower()
 
             if file_extension in supported_extensions:
                 try:
                     extractor = supported_extensions[file_extension]
-                    content = extractor(uploaded_file)
-                    documents.append(Document(page_content=content["text"], metadata={"source": file_name}))
+                    content = extractor(file_path)
+                    documents.append(Document(page_content=content["text"], metadata={"source": file_path}))
                 except Exception as e:
-                    print(f"Erreur lors du traitement du fichier {file_name}: {e}")
+                    print(f"Erreur lors du traitement du fichier {file_path}: {e}")
             else:
-                print(f"Type de fichier non pris en charge : {file_name}")
+                print(f"Type de fichier non pris en charge : {file_path}")
+
+        # Si c'est une liste (fichiers uploadés)
+        elif isinstance(source, list):
+            for uploaded_file in source:
+                file_name = uploaded_file.name.lower()
+                file_extension = file_name.split(".")[-1]
+
+                if file_extension in supported_extensions:
+                    try:
+                        extractor = supported_extensions[file_extension]
+                        content = extractor(uploaded_file)
+                        documents.append(Document(page_content=content["text"], metadata={"source": file_name}))
+                    except Exception as e:
+                        print(f"Erreur lors du traitement du fichier {file_name}: {e}")
+                else:
+                    print(f"Type de fichier non pris en charge : {file_name}")
 
     return documents
-
 
 def extract_content_from_pdf(file_path):
     """
@@ -192,7 +211,7 @@ def split_documents(documents, chunk_size=500, chunk_overlap=50):
 
 def create_vector_store(chunks):
     """
-    Crée une base vectorielle FAISS en utilisant SentenceTransformers.
+    Crée une base vectorielle FAISS en utilisant HuggingFaceEmbeddings.
 
     Parameters:
     - chunks (List[Document]): Liste des segments de documents, chaque segment ayant un attribut `page_content`.
@@ -203,24 +222,59 @@ def create_vector_store(chunks):
     model_name = "all-MiniLM-L6-v2"  # Modèle compact et rapide
 
     try:
-        # Charger le modèle SentenceTransformer
-        embedding_model = SentenceTransformer(model_name)
+        # Créer une fonction d'embedding compatible
+        embedding_function = HuggingFaceEmbeddings(model_name=model_name)
+
+        # Filtrer les documents valides (non vides)
+        valid_chunks = [chunk for chunk in chunks if chunk.page_content.strip()]
+        if not valid_chunks:
+            raise ValueError("Aucun document valide trouvé après filtrage.")
 
         # Extraire le contenu des segments pour les embeddings
-        texts = [chunk.page_content for chunk in chunks]
+        texts = [chunk.page_content for chunk in valid_chunks]
 
-        # Générer les embeddings
-        embeddings = embedding_model.encode(texts)
+        # Générer les embeddings et les convertir en tableau NumPy
+        embeddings = np.array(embedding_function.embed_documents(texts))
 
-        # Créer une base vectorielle FAISS
-        vector_store = FAISS(embeddings, chunks)
+        # Vérifier que le nombre d'embeddings correspond au nombre de documents valides
+        if len(embeddings) != len(valid_chunks):
+            raise ValueError("Le nombre d'embeddings ne correspond pas au nombre de documents valides.")
 
+        print(f"Nombre de documents initiaux : {len(chunks)}")
+        print(f"Nombre de documents valides : {len(valid_chunks)}")
+
+        # Créer un index FAISS
+        dimension = embeddings.shape[1]  # Déduire la dimension des embeddings
+        index = faiss.IndexFlatL2(dimension)  # Index avec la distance L2
+        index.add(embeddings)  # Ajouter les embeddings à l'index
+
+        # Associer l'index à un docstore en mémoire
+        docstore = InMemoryDocstore({str(i): chunk for i, chunk in enumerate(valid_chunks)})
+        index_to_docstore_id = {i: str(i) for i in range(len(valid_chunks))}
+
+        # Afficher le mapping après l'initialisation
+        print(f"Mapping index_to_docstore_id : {index_to_docstore_id}")
+
+        # Vérifiez la synchronisation entre le docstore et FAISS
+        for i in range(len(valid_chunks)):
+            if index_to_docstore_id[i] not in docstore._dict:
+                raise ValueError(f"Problème de synchronisation : ID {i} non trouvé dans le docstore.")
+
+        # Construire la base vectorielle FAISS
+        vector_store = FAISS(
+            index=index,
+            docstore=docstore,
+            index_to_docstore_id=index_to_docstore_id,
+            embedding_function=embedding_function,
+        )
+        print(f"Documents dans le docstore : {len(docstore._dict)}")
+        
         return vector_store
     except Exception as e:
         raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS : {e}")
-
-
+      
 def create_retrieval_qa_chain(vector_store):
+
     """
     Crée une chaîne de récupération et de génération de réponses en utilisant un store vectoriel FAISS.
 
@@ -253,3 +307,37 @@ def create_retrieval_qa_chain(vector_store):
         return ollama_query(prompt)
 
     return retriever, generate_answer
+
+# pdf_path = "/Users/sebastienstagno/ICAM/Machine Learning/Projet/Data/Base_Learning/TD/TD Regression.pdf"
+# documents = load_documents(pdf_path, is_directory=False)
+
+# chunks = split_documents(documents)
+# vector_store = create_vector_store(chunks)
+
+# retriever, generate_answer = create_retrieval_qa_chain(vector_store)
+
+# query = "Quels sont les sujets du TD ?"
+
+# try:
+#     print("Lancement de la recherche dans FAISS...")
+#     context_docs = retriever.invoke(query)
+
+#     if not context_docs:
+#         print("Aucun document pertinent trouvé.")
+#     else:
+#         print(f"Documents récupérés : {len(context_docs)}")
+#         context = "\n".join([doc.page_content for doc in context_docs])
+#         print(f"Contexte récupéré : {context[:200]}...")
+#         answer = generate_answer(query, context)
+#         print(f"Réponse générée : {answer}")
+# except ValueError as e:
+#     print(f"Erreur lors de la recherche : {e}")
+# except RuntimeError as e:
+#     print(f"Erreur système : {e}")
+
+# retriever, generate_answer = create_retrieval_qa_chain(vector_store)
+# query = "Quels sont les sujets du TD ?"
+# context_docs = retriever.get_relevant_documents(query)
+# context = "\n".join([doc.page_content for doc in context_docs])
+# answer = generate_answer(query, context)
+# print(answer)
