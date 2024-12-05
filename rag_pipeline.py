@@ -271,7 +271,7 @@ def create_vector_store(chunks):
         
         return vector_store
     except Exception as e:
-        raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS : {e}")
+        raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS") from e
       
 def create_retrieval_qa_chain(vector_store):
 
@@ -309,7 +309,7 @@ def create_retrieval_qa_chain(vector_store):
     return retriever, generate_answer
 
 def main():
-    pdf_path = "dev_data/Letters/2023-10-30_Attestation sur l'honneur inscription ordre des pharmaciens/Attestation sur lhonneur.pdf"
+    pdf_path = "dev_data/these.pdf"
     documents = load_documents(pdf_path, is_directory=False)
 
     chunks = split_documents(documents)
@@ -317,7 +317,7 @@ def main():
 
     retriever, generate_answer = create_retrieval_qa_chain(vector_store)
 
-    query = "Combien ai-je facturé ?"
+    query = "Quels algorithmes ont été utliisés?"
 
     try:
         print("Lancement de la recherche dans FAISS...")
