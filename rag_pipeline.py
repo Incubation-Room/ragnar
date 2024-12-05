@@ -240,8 +240,8 @@ def create_vector_store(chunks):
         if len(embeddings) != len(valid_chunks):
             raise ValueError("Le nombre d'embeddings ne correspond pas au nombre de documents valides.")
 
-        print(f"Nombre de documents initiaux : {len(chunks)}")
-        print(f"Nombre de documents valides : {len(valid_chunks)}")
+        # print(f"Nombre de documents initiaux : {len(chunks)}")
+        # print(f"Nombre de documents valides : {len(valid_chunks)}")
 
         # Créer un index FAISS
         dimension = embeddings.shape[1]  # Déduire la dimension des embeddings
@@ -253,7 +253,7 @@ def create_vector_store(chunks):
         index_to_docstore_id = {i: str(i) for i in range(len(valid_chunks))}
 
         # Afficher le mapping après l'initialisation
-        print(f"Mapping index_to_docstore_id : {index_to_docstore_id}")
+        # print(f"Mapping index_to_docstore_id : {index_to_docstore_id}")
 
         # Vérifiez la synchronisation entre le docstore et FAISS
         for i in range(len(valid_chunks)):
@@ -267,7 +267,7 @@ def create_vector_store(chunks):
             index_to_docstore_id=index_to_docstore_id,
             embedding_function=embedding_function,
         )
-        print(f"Documents dans le docstore : {len(docstore._dict)}")
+        # print(f"Documents dans le docstore : {len(docstore._dict)}")
         
         return vector_store
     except Exception as e:
@@ -308,6 +308,7 @@ def create_retrieval_qa_chain(vector_store):
 
     return retriever, generate_answer
 
+<<<<<<< HEAD
 def main():
     pdf_path = "dev_data/Letters/2023-10-30_Attestation sur l'honneur inscription ordre des pharmaciens/Attestation sur lhonneur.pdf"
     documents = load_documents(pdf_path, is_directory=False)
@@ -318,6 +319,17 @@ def main():
     retriever, generate_answer = create_retrieval_qa_chain(vector_store)
 
     query = "Combien ai-je facturé ?"
+=======
+pdf_path = "/Users/sebastienstagno/ICAM/Machine Learning/Projet/Data/Base_Learning/TD/TD Regression.pdf"
+documents = load_documents(pdf_path, is_directory=False)
+
+chunks = split_documents(documents)
+vector_store = create_vector_store(chunks)
+
+retriever, generate_answer = create_retrieval_qa_chain(vector_store)
+
+query = "Quels sont les différents sujets de TD présentés ?"
+>>>>>>> 058f0fd6dd71b58e7ba805fd9786da9a137954b3
 
     try:
         print("Lancement de la recherche dans FAISS...")
@@ -341,7 +353,7 @@ if __name__ == '__main__':
 
 # retriever, generate_answer = create_retrieval_qa_chain(vector_store)
 # query = "Quels sont les sujets du TD ?"
-# context_docs = retriever.get_relevant_documents(query)
-# context = "\n".join([doc.page_content for doc in context_docs])
-# answer = generate_answer(query, context)
-# print(answer)
+context_docs = retriever.get_relevant_documents(query)
+context = "\n".join([doc.page_content for doc in context_docs])
+answer = generate_answer(query, context)
+print(answer)
