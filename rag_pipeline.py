@@ -391,9 +391,8 @@ def create_retrieval_qa_chain(vector_store, initial_context=None, search_type="s
         - str: La réponse générée.
         """
         prompt = f"""
-        Initial Context: {initial_context}
-        Retrieved Context: {context}
-        Question: {query}
+        Voici les fichiers qui ont été retrouvés d'après la requête: {context}
+        Utilise leur contenu pour répondre à cette question: {query}
         Answer:
         """
         try:
