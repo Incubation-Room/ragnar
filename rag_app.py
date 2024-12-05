@@ -166,7 +166,6 @@ def display_sources(context_docs):
             
             # Construire un chemin relatif par rapport au répertoire de base
             file_source_relative = os.path.relpath(file_source, start=BASE_DIR)
-            file_source_relative = 'dev_data/archive_Ca_MR/Compte-rendu CA Maison Rose 24 septembre 2024.pdf'
             st.markdown(f"[Link to source file]({file_source_relative})")
         else:
             # Affiche simplement la source sous forme de texte si le chemin est inconnu
