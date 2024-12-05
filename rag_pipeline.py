@@ -118,7 +118,16 @@ def load_documents(source, is_directory=False):
                     try:
                         extractor = supported_extensions[file_extension]
                         content = extractor(file_path)
-                        documents.append(Document(page_content=content["text"], metadata={"source": file_path}))
+                        documents.append(
+                            Document(
+                                page_content=content["text"],
+                                metadata={
+                                    "source": file_path,
+                                    "title": content["metadata"].get("title", "Titre non défini"),
+                                    "date": content["metadata"].get("date", "Date non définie"),
+                                },
+                            )
+                        )
                     except Exception as e:
                         print(f"Erreur lors du traitement du fichier {file_path}: {e}")
                 else:
@@ -133,27 +142,20 @@ def load_documents(source, is_directory=False):
                 try:
                     extractor = supported_extensions[file_extension]
                     content = extractor(file_path)
-                    documents.append(Document(page_content=content["text"], metadata={"source": file_path}))
+                    documents.append(
+                        Document(
+                            page_content=content["text"],
+                            metadata={
+                                "source": file_path,
+                                "title": content["metadata"].get("title", "Titre non défini"),
+                                "date": content["metadata"].get("date", "Date non définie"),
+                            },
+                        )
+                    )
                 except Exception as e:
                     print(f"Erreur lors du traitement du fichier {file_path}: {e}")
             else:
                 print(f"Type de fichier non pris en charge : {file_path}")
-
-        # Si c'est une liste (fichiers uploadés)
-        elif isinstance(source, list):
-            for uploaded_file in source:
-                file_name = uploaded_file.name.lower()
-                file_extension = file_name.split(".")[-1]
-
-                if file_extension in supported_extensions:
-                    try:
-                        extractor = supported_extensions[file_extension]
-                        content = extractor(uploaded_file)
-                        documents.append(Document(page_content=content["text"], metadata={"source": file_name}))
-                    except Exception as e:
-                        print(f"Erreur lors du traitement du fichier {file_name}: {e}")
-                else:
-                    print(f"Type de fichier non pris en charge : {file_name}")
 
     return documents
 
@@ -162,7 +164,7 @@ def extract_content_from_pdf(file_path):
     Extrait le contenu d'un fichier PDF, incluant :
     - Texte extrait des pages PDF.
     - Texte extrait des images dans le PDF via OCR.
-    - Informations des métadonnées, si disponibles.
+    - Informations des métadonnées, y compris le titre et la date.
 
     Parameters:
     - file_path (str): Chemin vers le fichier PDF.
@@ -183,6 +185,29 @@ def extract_content_from_pdf(file_path):
 
         content["text"] = text_content.strip()
 
+        # Extraire les métadonnées générales
+        metadata = doc.metadata or {}
+        content["metadata"] = metadata
+
+        # Tenter d'extraire le titre et la date depuis les métadonnées
+        title = metadata.get("title", None)
+        creation_date = metadata.get("creationDate", None)
+
+        # Si le titre n'est pas dans les métadonnées, essayer de l'inférer depuis le texte
+        if not title and text_content:
+            first_line = text_content.split("\n")[0].strip()
+            if len(first_line) > 5:  # Longueur minimale pour éviter des titres peu informatifs
+                title = first_line
+
+        # Formater la date si elle est présente dans les métadonnées
+        if creation_date:
+            creation_date = fitz.Document.convert_date(creation_date)  # Conversion automatique de date
+            creation_date = creation_date.strftime("%Y-%m-%d")  # Format ISO8601
+
+        # Ajout des valeurs calculées aux métadonnées
+        content["metadata"]["title"] = title or "Titre non défini"
+        content["metadata"]["date"] = creation_date or "Date non définie"
+
         # Extraire les images et appliquer l'OCR
         image_texts = []
         for page_num in range(len(doc)):
@@ -200,9 +225,6 @@ def extract_content_from_pdf(file_path):
                     content["errors"].append(error_msg)
 
         content["ocr_text"] = "\n".join(image_texts)
-
-        # Extraire les métadonnées
-        content["metadata"] = doc.metadata or {}
 
     except Exception as e:
         content["errors"].append(f"Erreur lors de l'extraction du PDF : {e}")
@@ -231,18 +253,17 @@ def split_documents(documents, chunk_size=500, chunk_overlap=50):
         raise RuntimeError(f"Erreur lors de la division des documents : {e}")
 
 
-def create_vector_store(chunks):
+def create_vector_store(chunks, model_name="all-MiniLM-L6-v2"):
     """
     Crée une base vectorielle FAISS en utilisant HuggingFaceEmbeddings.
 
     Parameters:
     - chunks (List[Document]): Liste des segments de documents, chaque segment ayant un attribut `page_content`.
+    - model_name (str): Modèle de sentence embeddings à utiliser (par défaut : "all-MiniLM-L6-v2").
 
     Returns:
     - FAISS: Une base vectorielle prête à l'emploi pour la récupération d'information.
     """
-    model_name = "all-MiniLM-L6-v2"  # Modèle compact et rapide
-
     try:
         # Créer une fonction d'embedding compatible
         embedding_function = HuggingFaceEmbeddings(model_name=model_name)
@@ -262,9 +283,6 @@ def create_vector_store(chunks):
         if len(embeddings) != len(valid_chunks):
             raise ValueError("Le nombre d'embeddings ne correspond pas au nombre de documents valides.")
 
-        # print(f"Nombre de documents initiaux : {len(chunks)}")
-        # print(f"Nombre de documents valides : {len(valid_chunks)}")
-
         # Créer un index FAISS
         dimension = embeddings.shape[1]  # Déduire la dimension des embeddings
         index = faiss.IndexFlatL2(dimension)  # Index avec la distance L2
@@ -273,9 +291,6 @@ def create_vector_store(chunks):
         # Associer l'index à un docstore en mémoire
         docstore = InMemoryDocstore({str(i): chunk for i, chunk in enumerate(valid_chunks)})
         index_to_docstore_id = {i: str(i) for i in range(len(valid_chunks))}
-
-        # Afficher le mapping après l'initialisation
-        # print(f"Mapping index_to_docstore_id : {index_to_docstore_id}")
 
         # Vérifiez la synchronisation entre le docstore et FAISS
         for i in range(len(valid_chunks)):
@@ -289,11 +304,10 @@ def create_vector_store(chunks):
             index_to_docstore_id=index_to_docstore_id,
             embedding_function=embedding_function,
         )
-        # print(f"Documents dans le docstore : {len(docstore._dict)}")
         
         return vector_store
     except Exception as e:
-        raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS") from e
+        raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS : {e}")
 
 def determine_optimal_k(documents, question, max_k=20, min_k=3):
     """
@@ -396,6 +410,22 @@ def main():
     interroger le système RAG, et permettre de poser plusieurs questions.
     Permet de traiter un fichier unique ou un dossier.
     """
+    # Sélectionnez un modèle pour les embeddings
+    print("Modèles disponibles :")
+    print("1. all-MiniLM-L6-v2 (Rapide, multilingue)")
+    print("2. paraphrase-multilingual-mpnet-base-v2 (Multilingue, haute précision)")
+    print("3. sentence-transformers/LaBSE (Spécifique multilingue)")
+    print("4. dangvantuan/sentence-camembert-large (Français, expérimental)")
+    model_choice = input("Sélectionnez un modèle (1-4) : ").strip()
+
+    model_mapping = {
+        "1": "all-MiniLM-L6-v2",
+        "2": "paraphrase-multilingual-mpnet-base-v2",
+        "3": "sentence-transformers/LaBSE",
+        "4": "dangvantuan/sentence-camembert-large"
+    }
+    model_name = model_mapping.get(model_choice, "all-MiniLM-L6-v2")
+    print(f"Modèle sélectionné : {model_name}\n")
     # Demander le chemin du fichier ou du dossier
     source_path = input("Entrez le chemin du fichier ou du dossier : ").strip()
     if not source_path:
