@@ -4,17 +4,11 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.schema import Document
 import faiss
 from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 import numpy as np
-from sentence_transformers import SentenceTransformer
-import pytesseract
-from PIL import Image
-import fitz  # PyMuPDF
-import pandas as pd
-import subprocess
 import requests
+from extract_pdf import extract_content_from_pdf
 import json
 import os
 import io
@@ -75,17 +69,17 @@ def normalize_path(path):
         path = path[1:-1]  # Supprime les guillemets simples ou doubles entourant le chemin
     return os.path.abspath(path)  # Renvoie le chemin absolu normalisé
 
-class Document:
-    def __init__(self, page_content, metadata):
-        """
-        Représente un document avec son contenu et ses métadonnées.
+# class Document:
+#     def __init__(self, page_content, metadata):
+#         """
+#         Représente un document avec son contenu et ses métadonnées.
 
-        Parameters:
-        - page_content (str): Contenu textuel du document.
-        - metadata (dict): Métadonnées associées au document.
-        """
-        self.page_content = page_content
-        self.metadata = metadata
+#         Parameters:
+#         - page_content (str): Contenu textuel du document.
+#         - metadata (dict): Métadonnées associées au document.
+#         """
+#         self.page_content = page_content
+#         self.metadata = metadata
 
 
 def load_documents(source, is_directory=False):
@@ -158,77 +152,6 @@ def load_documents(source, is_directory=False):
 
     return documents
 
-def extract_content_from_pdf(file_path):
-    """
-    Extrait le contenu d'un fichier PDF, incluant :
-    - Texte extrait des pages PDF.
-    - Texte extrait des images dans le PDF via OCR.
-    - Informations des métadonnées, y compris le titre et la date.
-
-    Parameters:
-    - file_path (str): Chemin vers le fichier PDF.
-
-    Returns:
-    - dict: Contient le texte, les métadonnées, et les erreurs rencontrées.
-    """
-    content = {"text": "", "ocr_text": "", "metadata": {}, "errors": []}
-
-    try:
-        # Charger le PDF avec PyMuPDF (fitz)
-        doc = fitz.open(file_path)
-
-        # Extraire le texte des pages
-        text_content = ""
-        for page in doc:
-            text_content += page.get_text()
-
-        content["text"] = text_content.strip()
-
-        # Extraire les métadonnées générales
-        metadata = doc.metadata or {}
-        content["metadata"] = metadata
-
-        # Tenter d'extraire le titre et la date depuis les métadonnées
-        title = metadata.get("title", None)
-        creation_date = metadata.get("creationDate", None)
-
-        # Si le titre n'est pas dans les métadonnées, essayer de l'inférer depuis le texte
-        if not title and text_content:
-            first_line = text_content.split("\n")[0].strip()
-            if len(first_line) > 5:  # Longueur minimale pour éviter des titres peu informatifs
-                title = first_line
-
-        # Formater la date si elle est présente dans les métadonnées
-        if creation_date:
-            creation_date = fitz.Document.convert_date(creation_date)  # Conversion automatique de date
-            creation_date = creation_date.strftime("%Y-%m-%d")  # Format ISO8601
-
-        # Ajout des valeurs calculées aux métadonnées
-        content["metadata"]["title"] = title or "Titre non défini"
-        content["metadata"]["date"] = creation_date or "Date non définie"
-
-        # Extraire les images et appliquer l'OCR
-        image_texts = []
-        for page_num in range(len(doc)):
-            page = doc[page_num]
-            for img_index, img in enumerate(page.get_images(full=True)):
-                try:
-                    xref = img[0]
-                    base_image = doc.extract_image(xref)
-                    image_bytes = base_image["image"]
-                    image = Image.open(io.BytesIO(image_bytes))
-                    ocr_text = pytesseract.image_to_string(image)
-                    image_texts.append(ocr_text)
-                except Exception as e:
-                    error_msg = f"Erreur lors de l'extraction d'une image à la page {page_num + 1}: {e}"
-                    content["errors"].append(error_msg)
-
-        content["ocr_text"] = "\n".join(image_texts)
-
-    except Exception as e:
-        content["errors"].append(f"Erreur lors de l'extraction du PDF : {e}")
-
-    return content
 
 
 def split_documents(documents, chunk_size=500, chunk_overlap=50):
