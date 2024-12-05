@@ -308,7 +308,6 @@ def create_retrieval_qa_chain(vector_store):
 
     return retriever, generate_answer
 
-<<<<<<< HEAD
 def main():
     pdf_path = "dev_data/Letters/2023-10-30_Attestation sur l'honneur inscription ordre des pharmaciens/Attestation sur lhonneur.pdf"
     documents = load_documents(pdf_path, is_directory=False)
@@ -319,17 +318,6 @@ def main():
     retriever, generate_answer = create_retrieval_qa_chain(vector_store)
 
     query = "Combien ai-je facturé ?"
-=======
-pdf_path = "/Users/sebastienstagno/ICAM/Machine Learning/Projet/Data/Base_Learning/TD/TD Regression.pdf"
-documents = load_documents(pdf_path, is_directory=False)
-
-chunks = split_documents(documents)
-vector_store = create_vector_store(chunks)
-
-retriever, generate_answer = create_retrieval_qa_chain(vector_store)
-
-query = "Quels sont les différents sujets de TD présentés ?"
->>>>>>> 058f0fd6dd71b58e7ba805fd9786da9a137954b3
 
     try:
         print("Lancement de la recherche dans FAISS...")
@@ -347,13 +335,12 @@ query = "Quels sont les différents sujets de TD présentés ?"
         print(f"Erreur lors de la recherche : {e}")
     except RuntimeError as e:
         print(f"Erreur système : {e}")
+    # retriever, generate_answer = create_retrieval_qa_chain(vector_store)
+    # query = "Quels sont les sujets du TD ?"
+    context_docs = retriever.get_relevant_documents(query)
+    context = "\n".join([doc.page_content for doc in context_docs])
+    answer = generate_answer(query, context)
+    print(answer)
 
 if __name__ == '__main__':
     main()
-
-# retriever, generate_answer = create_retrieval_qa_chain(vector_store)
-# query = "Quels sont les sujets du TD ?"
-context_docs = retriever.get_relevant_documents(query)
-context = "\n".join([doc.page_content for doc in context_docs])
-answer = generate_answer(query, context)
-print(answer)
