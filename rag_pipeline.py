@@ -308,32 +308,36 @@ def create_retrieval_qa_chain(vector_store):
 
     return retriever, generate_answer
 
-# pdf_path = "/Users/sebastienstagno/ICAM/Machine Learning/Projet/Data/Base_Learning/TD/TD Regression.pdf"
-# documents = load_documents(pdf_path, is_directory=False)
+def main():
+    pdf_path = "dev_data/Letters/2023-10-30_Attestation sur l'honneur inscription ordre des pharmaciens/Attestation sur lhonneur.pdf"
+    documents = load_documents(pdf_path, is_directory=False)
 
-# chunks = split_documents(documents)
-# vector_store = create_vector_store(chunks)
+    chunks = split_documents(documents)
+    vector_store = create_vector_store(chunks)
 
-# retriever, generate_answer = create_retrieval_qa_chain(vector_store)
+    retriever, generate_answer = create_retrieval_qa_chain(vector_store)
 
-# query = "Quels sont les sujets du TD ?"
+    query = "Combien ai-je facturé ?"
 
-# try:
-#     print("Lancement de la recherche dans FAISS...")
-#     context_docs = retriever.invoke(query)
+    try:
+        print("Lancement de la recherche dans FAISS...")
+        context_docs = retriever.invoke(query)
 
-#     if not context_docs:
-#         print("Aucun document pertinent trouvé.")
-#     else:
-#         print(f"Documents récupérés : {len(context_docs)}")
-#         context = "\n".join([doc.page_content for doc in context_docs])
-#         print(f"Contexte récupéré : {context[:200]}...")
-#         answer = generate_answer(query, context)
-#         print(f"Réponse générée : {answer}")
-# except ValueError as e:
-#     print(f"Erreur lors de la recherche : {e}")
-# except RuntimeError as e:
-#     print(f"Erreur système : {e}")
+        if not context_docs:
+            print("Aucun document pertinent trouvé.")
+        else:
+            print(f"Documents récupérés : {len(context_docs)}")
+            context = "\n".join([doc.page_content for doc in context_docs])
+            print(f"Contexte récupéré : {context[:200]}...")
+            answer = generate_answer(query, context)
+            print(f"Réponse générée : {answer}")
+    except ValueError as e:
+        print(f"Erreur lors de la recherche : {e}")
+    except RuntimeError as e:
+        print(f"Erreur système : {e}")
+
+if __name__ == '__main__':
+    main()
 
 # retriever, generate_answer = create_retrieval_qa_chain(vector_store)
 # query = "Quels sont les sujets du TD ?"
