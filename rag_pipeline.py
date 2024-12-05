@@ -53,6 +53,28 @@ def ollama_query(prompt, model="llama3.2", api_url="http://localhost:11434/api/g
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"Erreur lors de la requête à Ollama : {e}")
 
+# Définir le contexte initial
+DEFAULT_CONTEXT = """
+This system is designed to assist an association in managing its activities.
+It provides relevant answers based on the provided documents. Please ensure your responses are concise, helpful, and aligned with this purpose.
+"""
+
+# Permettre la personnalisation du contexte
+def get_initial_prompt(user_context=None):
+    """
+    Génère le prompt initial pour définir le contexte d'utilisation.
+    :param user_context: Contexte personnalisé, ou utilise le contexte par défaut.
+    :return: Prompt formaté pour inclure le contexte.
+    """
+    return user_context if user_context else DEFAULT_CONTEXT
+
+def normalize_path(path):
+    """
+    Normalise un chemin pour s'assurer qu'il est compatible avec les systèmes de fichiers.
+    """
+    if path.startswith(("'", '"')) and path.endswith(("'", '"')):
+        path = path[1:-1]  # Supprime les guillemets simples ou doubles entourant le chemin
+    return os.path.abspath(path)  # Renvoie le chemin absolu normalisé
 
 class Document:
     def __init__(self, page_content, metadata):
@@ -272,25 +294,80 @@ def create_vector_store(chunks):
         return vector_store
     except Exception as e:
         raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS") from e
-      
-def create_retrieval_qa_chain(vector_store):
 
+def determine_optimal_k(documents, question, max_k=20, min_k=3):
+    """
+    Détermine dynamiquement le nombre optimal de chunks (k) à prendre en compte.
+
+    Parameters:
+    - documents (List[Document]): Liste des documents ou chunks disponibles.
+    - question (str): La question posée par l'utilisateur.
+    - max_k (int): Nombre maximal de chunks à prendre en compte.
+    - min_k (int): Nombre minimal de chunks à prendre en compte.
+
+    Returns:
+    - int: Nombre optimal de chunks à utiliser.
+    """
+    # Gérer les cas où `documents` ou `question` est None
+    if documents is None or len(documents) == 0:
+        print("Aucun document fourni ou liste vide.")
+        return min_k  # Retourne une valeur minimale par défaut
+
+    if question is None or not isinstance(question, str) or len(question.strip()) == 0:
+        print("Question non valide ou vide.")
+        question_length = 0
+    else:
+        question_length = len(question.split())
+
+    # Ajuster k en fonction de la taille des documents
+    if len(documents) < min_k:
+        return len(documents)
+    elif len(documents) <= max_k:
+        return len(documents)
+    else:
+        if question_length <= 10:  # Question courte et spécifique
+            return min_k
+        elif question_length <= 25:  # Question moyenne
+            return min(min_k + 2, max_k)
+        else:  # Question longue ou exploratoire
+            return max_k
+
+def create_retrieval_qa_chain(vector_store, initial_context=None, search_type="similarity", k=None, question=None):
     """
     Crée une chaîne de récupération et de génération de réponses en utilisant un store vectoriel FAISS.
+    Ajuste dynamiquement le nombre de chunks (k).
 
     Parameters:
     - vector_store (FAISS): La base vectorielle utilisée pour la récupération des documents pertinents.
+    - initial_context (str, optional): Contexte initial pour guider les réponses générées.
+    - search_type (str): Type de recherche utilisé (par défaut : "similarity").
+    - k (int): Nombre de documents à récupérer (par défaut : 5).
 
     Returns:
     - tuple: 
         - retriever (Callable): Fonction pour récupérer les documents les plus pertinents.
         - generate_answer (Callable): Fonction pour générer une réponse basée sur une question et un contexte.
     """
-    retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
+    # Récupérer le contexte initial ou utiliser celui par défaut
+    initial_context = get_initial_prompt(initial_context)
+
+    # Déterminer dynamiquement le nombre de chunks si `k` n'est pas défini
+    if k is None:
+        if question:
+            k = determine_optimal_k(vector_store.docstore._dict.values(), question)
+        else:
+            k = 5  # Valeur par défaut si aucune question n'est fournie
+
+    # Assurez-vous que k est un entier positif
+    if not isinstance(k, int) or k <= 0:
+        raise ValueError(f"Le paramètre 'k' doit être un entier positif. Valeur reçue : {k}")
+
+    # Configurer le retriever avec les paramètres spécifiés
+    retriever = vector_store.as_retriever(search_type=search_type, search_kwargs={"k": k})
 
     def generate_answer(query, context):
         """
-        Génère une réponse en interrogeant Ollama avec un prompt contenant le contexte et la question.
+        Génère une réponse en interrogeant Ollama avec un prompt contenant le contexte initial, le contexte des documents, et la question.
 
         Parameters:
         - query (str): La question posée par l'utilisateur.
@@ -300,47 +377,101 @@ def create_retrieval_qa_chain(vector_store):
         - str: La réponse générée.
         """
         prompt = f"""
-        Context: {context}
+        Initial Context: {initial_context}
+        Retrieved Context: {context}
         Question: {query}
         Answer:
         """
-        return ollama_query(prompt)
+        try:
+            return ollama_query(prompt)
+        except RuntimeError as e:
+            raise RuntimeError(f"Error generating answer: {e}")
 
     return retriever, generate_answer
 
+
 def main():
-    pdf_path = "dev_data/these.pdf"
-    documents = load_documents(pdf_path, is_directory=False)
+    """
+    Fonction principale pour charger des documents, créer une base vectorielle,
+    interroger le système RAG, et permettre de poser plusieurs questions.
+    Permet de traiter un fichier unique ou un dossier.
+    """
+    # Demander le chemin du fichier ou du dossier
+    source_path = input("Entrez le chemin du fichier ou du dossier : ").strip()
+    if not source_path:
+        print("Le chemin ne peut pas être vide.")
+        return
 
+    # Normaliser le chemin pour gérer les guillemets et obtenir un chemin absolu
+    source_path = normalize_path(source_path)
+
+    # Vérifier si le chemin est un fichier ou un dossier
+    if os.path.isfile(source_path):
+        is_directory = False
+    elif os.path.isdir(source_path):
+        is_directory = True
+    else:
+        print("Le chemin fourni n'est ni un fichier ni un dossier valide.")
+        return
+
+    # Charger les documents
+    documents = load_documents(source_path, is_directory=is_directory)
+    if not documents:
+        print("Aucun document valide chargé.")
+        return
+
+    # Diviser les documents en chunks
     chunks = split_documents(documents)
-    vector_store = create_vector_store(chunks)
+    if not chunks:
+        print("Aucun chunk valide généré à partir des documents.")
+        return
 
+    # Créer la base vectorielle FAISS
+    try:
+        vector_store = create_vector_store(chunks)
+    except RuntimeError as e:
+        print(f"Erreur lors de la création de la base vectorielle FAISS : {e}")
+        return
+
+    # Créer la chaîne de récupération et génération de réponses
     retriever, generate_answer = create_retrieval_qa_chain(vector_store)
 
-    query = "Quels algorithmes ont été utliisés?"
+    print("\nLe système est prêt. Vous pouvez poser vos questions.")
+    print("Tapez 'exit' pour mettre fin au test.\n")
 
-    try:
-        print("Lancement de la recherche dans FAISS...")
-        context_docs = retriever.invoke(query)
+    # Boucle interactive pour poser des questions
+    while True:
+        # Demander une question à l'utilisateur
+        query = input("Entrez votre question : ").strip()
+        if query.lower() == "exit":
+            print("Fin du test. Merci d'avoir utilisé le système.")
+            break
+        if not query:
+            print("La question ne peut pas être vide. Veuillez réessayer.")
+            continue
 
-        if not context_docs:
-            print("Aucun document pertinent trouvé.")
-        else:
+        try:
+            print("\nLancement de la recherche dans FAISS...")
+            # Récupérer les documents pertinents
+            context_docs = retriever.invoke(query)
+
+            if not context_docs:
+                print("Aucun document pertinent trouvé.")
+                continue
+
             print(f"Documents récupérés : {len(context_docs)}")
+
+            # Générer la réponse basée sur les documents récupérés
             context = "\n".join([doc.page_content for doc in context_docs])
-            print(f"Contexte récupéré : {context[:200]}...")
+            print(f"Contexte récupéré : {context[:200]}...")  # Limité à 200 caractères pour l'affichage
             answer = generate_answer(query, context)
-            print(f"Réponse générée : {answer}")
-    except ValueError as e:
-        print(f"Erreur lors de la recherche : {e}")
-    except RuntimeError as e:
-        print(f"Erreur système : {e}")
-    # retriever, generate_answer = create_retrieval_qa_chain(vector_store)
-    # query = "Quels sont les sujets du TD ?"
-    context_docs = retriever.get_relevant_documents(query)
-    context = "\n".join([doc.page_content for doc in context_docs])
-    answer = generate_answer(query, context)
-    print(answer)
+            print(f"Réponse générée : {answer}\n")
+
+        except ValueError as e:
+            print(f"Erreur lors de la recherche : {e}")
+        except RuntimeError as e:
+            print(f"Erreur système : {e}")
+
 
 if __name__ == '__main__':
     main()

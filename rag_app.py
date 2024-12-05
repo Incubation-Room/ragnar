@@ -2,24 +2,18 @@ import os
 from pathlib import Path
 import streamlit as st
 from rag_pipeline import (
+    normalize_path,
     load_documents,
     split_documents,
     create_vector_store,
     create_retrieval_qa_chain,
+    get_initial_prompt,  # Import de la fonction pour gérer le contexte
 )
 # Classe Document pour garantir la compatibilité avec split_documents
 class Document:
     def __init__(self, page_content, metadata):
         self.page_content = page_content
         self.metadata = metadata
-
-def normalize_path(path):
-    """
-    Normalise un chemin pour s'assurer qu'il est compatible avec les systèmes de fichiers.
-    """
-    if path.startswith(("'", '"')) and path.endswith(("'", '"')):
-        path = path[1:-1]  # Supprime les guillemets simples ou doubles entourant le chemin
-    return os.path.abspath(path)  # Renvoie le chemin absolu normalisé
 
 def main():
     st.title("RAG System with Ollama")
@@ -32,6 +26,12 @@ def main():
         st.session_state.vector_store = None
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
+
+    # Définir un contexte fixe en interne
+    context = """
+    This system is designed to assist an association in managing its activities.
+    It provides relevant answers based on the provided documents. Please ensure your responses are concise, helpful, and aligned with this purpose.
+    """
 
     # Section pour glisser-déposer des fichiers
     uploaded_files = st.file_uploader(
@@ -46,7 +46,7 @@ def main():
     # Use the default folder for the folder path input
     folder_path = st.text_input("Or enter the path to your target folder:", placeholder=default_folder)
 
-    # Bouton pour lancer l'analyse
+    # Bouton pour lancer l’analyse
     if st.button("Analyze"):
         if not uploaded_files and not folder_path:
             folder_path= str(default_folder)
@@ -101,10 +101,13 @@ def main():
                 with st.spinner("Fetching your answer..."):
                     try:
                         # Requête au système RAG
-                        retriever, generate_answer = create_retrieval_qa_chain(st.session_state.vector_store)
+                        retriever, generate_answer = create_retrieval_qa_chain(
+                            st.session_state.vector_store,
+                            initial_context=context,  # Passer le contexte fixe ici
+                        )
                         context_docs = retriever.invoke(user_input)
-                        context = "\n".join([doc.page_content for doc in context_docs])
-                        answer = generate_answer(user_input, context)
+                        context_retrieved = "\n".join([doc.page_content for doc in context_docs])
+                        answer = generate_answer(user_input, context_retrieved)
 
                         # Ajouter la réponse à l'historique
                         st.session_state.chat_history.append({"role": "assistant", "message": answer})
