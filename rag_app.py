@@ -116,11 +116,27 @@ def main():
                                 st.markdown(f"**RAG System:** {msg['message']}")
 
                         # Afficher les documents sources
-                        st.subheader("Source Documents")
-                        for doc in context_docs:
-                            st.write(f"Source: {doc.metadata['source']}")
+                        display_sources(context_docs)
+
+
                     except Exception as e:
                         st.error(f"An error occurred during the query: {e}")
+
+def display_sources(context_docs):
+    st.subheader("Source Documents")
+    for doc in context_docs:
+                            # Vérifiez si la source contient un chemin de fichier
+        file_source = doc.metadata.get('source', 'Unknown source')
+                            
+                            # Créer un lien vers le fichier source si possible
+        if os.path.exists(file_source):
+            st.markdown(f"[Link to source file]({file_source})")
+        else:
+            st.write(f"Source: {file_source}")
+
+                            # Afficher le contenu du chunk avec un bouton pour le développer
+        with st.expander(f"View content of this chunk from {file_source}"):
+            st.write(doc.page_content)
 
 if __name__ == "__main__":
     main()
