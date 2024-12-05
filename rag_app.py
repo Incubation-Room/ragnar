@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import streamlit as st
 from rag_pipeline import (
+    build_context_from_docs,
     normalize_path,
     load_documents,
     split_documents,
@@ -106,7 +107,7 @@ def main():
                             initial_context=context,  # Passer le contexte fixe ici
                         )
                         context_docs = retriever.invoke(user_input)
-                        context_retrieved = "\n".join([doc.page_content for doc in context_docs])
+                        context_retrieved = build_context_from_docs(context_docs)
                         answer = generate_answer(user_input, context_retrieved)
 
                         # Ajouter la réponse à l'historique

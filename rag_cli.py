@@ -21,7 +21,7 @@ Fonctions principales :
 
 import os
 from pathlib import Path
-from rag_pipeline import normalize_path, load_documents, split_documents, create_retrieval_qa_chain, create_vector_store
+from rag_pipeline import build_context_from_docs, normalize_path, load_documents, split_documents, create_retrieval_qa_chain, create_vector_store
 
 def print_model_options():
     """
@@ -59,10 +59,10 @@ def get_source_path():
     Returns:
         Path: Le chemin normalisé.
     """
-    source_path = input("Entrez le chemin du fichier ou du dossier : ").strip()
+    current_folder = Path(os.getcwd())  # Répertoire courant
+    default_folder = current_folder / "dev_data" / "archive_Ca_MR"
+    source_path = input(f"Entrez le chemin du fichier ou du dossier (default:{default_folder}): ").strip()
     if not source_path:
-        current_folder = Path(os.getcwd())  # Répertoire courant
-        default_folder = current_folder / "dev_data" / "archive_Ca_MR"
         source_path = str(default_folder)
 
     return normalize_path(source_path)
@@ -158,11 +158,12 @@ def run_interactive_query(retriever, generate_answer):
             if not context_docs:
                 print("Aucun document pertinent trouvé.")
                 continue
-
+            context_retrieved = build_context_from_docs(context_docs)
+            answer = generate_answer(query, context_retrieved)
             print(f"Documents récupérés : {len(context_docs)}")
-            context = "\n".join([doc.page_content for doc in context_docs])
-            print(f"Contexte récupéré : {context[:200]}...")  # Limité à 200 caractères pour l'affichage
-            answer = generate_answer(query, context)
+            # context = "\n\n".join([doc.page_content for doc in context_docs])
+            print(f"Contexte récupéré : {context_retrieved}")  # Limité à 200 caractères pour l'affichage
+            answer = generate_answer(query, context_retrieved)
             print(f"Réponse générée : {answer}\n")
 
         except ValueError as e:

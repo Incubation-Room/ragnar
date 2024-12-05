@@ -54,8 +54,8 @@ def ollama_query(prompt, model="llama3.2", api_url="http://localhost:11434/api/g
 
 # Définir le contexte initial
 DEFAULT_CONTEXT = """
-This system is designed to assist an association in managing its activities.
-It provides relevant answers based on the provided documents. Please ensure your responses are concise, helpful, and aligned with this purpose.
+Ce système est conçu pour aider une association à gérer ses activités. 
+Il fournit des réponses pertinentes basées sur les documents fournis. Veuillez vous assurer que vos réponses sont concises, utiles et alignées avec cet objectif.
 """
 
 # Permettre la personnalisation du contexte
@@ -344,6 +344,24 @@ def determine_optimal_k(documents, question, max_k=20, min_k=3):
             return min(min_k + 2, max_k)
         else:  # Question longue ou exploratoire
             return max_k
+        
+def build_context_from_docs(context_docs):
+    """
+    Builds a context string from the retrieved documents, including metadata.
+
+    Args:
+        context_docs (list): List of documents retrieved, each with `page_content` and `metadata` attributes.
+
+    Returns:
+        str: A formatted string combining document metadata and content.
+    """
+    return "\n".join(
+        [
+            f"Metadata: {doc.metadata}\nContent: {doc.page_content}" 
+            for doc in context_docs
+        ]
+    )
+
 
 def create_retrieval_qa_chain(vector_store, initial_context=None, search_type="similarity", k=None, question=None):
     """
