@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import streamlit as st
 from rag_pipeline import (
     load_documents,
@@ -6,7 +7,6 @@ from rag_pipeline import (
     create_vector_store,
     create_retrieval_qa_chain,
 )
-
 # Classe Document pour garantir la compatibilité avec split_documents
 class Document:
     def __init__(self, page_content, metadata):
@@ -39,15 +39,17 @@ def main():
         type=["pdf", "docx", "xlsx", "xls", "txt"],
         accept_multiple_files=True
     )
-
-    # Section pour entrer un chemin de dossier
-    folder_path = st.text_input("Or enter the path to your target folder:", value="")
+    
+    # Get the directory where the Streamlit app is being run
+    current_folder = Path(os.getcwd())  # This will be the current directory
+    default_folder = current_folder / "dev_data" / "archive_Ca_MR"
+    # Use the default folder for the folder path input
+    folder_path = st.text_input("Or enter the path to your target folder:", placeholder=default_folder)
 
     # Bouton pour lancer l'analyse
     if st.button("Analyze"):
         if not uploaded_files and not folder_path:
-            st.warning("Please upload files or provide a folder path before analyzing.")
-            return
+            folder_path= str(default_folder)
 
         # Normaliser le chemin si défini
         if folder_path:
@@ -122,20 +124,52 @@ def main():
                     except Exception as e:
                         st.error(f"An error occurred during the query: {e}")
 
+
+
+# Définir le répertoire de base pour les chemins relatifs (racine de votre projet)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 def display_sources(context_docs):
+    """
+    Affiche les documents sources associés à la réponse générée par le modèle,
+    avec un lien vers le fichier source (si disponible) et un moyen de visualiser 
+    le contenu du chunk associé.
+
+    Args:
+        context_docs (list): Une liste de documents contenant les informations 
+                              sur la source et le contenu des chunks.
+
+    Cette fonction fait ce qui suit :
+        - Affiche un sous-titre pour les documents sources.
+        - Crée un lien vers le fichier source, si le chemin est valide.
+        - Affiche le contenu du chunk associé, avec la possibilité de l'étendre
+          pour une visualisation détaillée.
+    """
     st.subheader("Source Documents")
+    
+    # Parcourir chaque document dans context_docs
     for doc in context_docs:
-                            # Vérifiez si la source contient un chemin de fichier
+        # Récupérer le chemin de la source à partir des métadonnées
         file_source = doc.metadata.get('source', 'Unknown source')
-                            
-                            # Créer un lien vers le fichier source si possible
+        # Construire un chemin relatif si possible
+
+        # Vérifiez si la source contient un chemin de fichier et si le fichier existe
         if os.path.exists(file_source):
-            st.markdown(f"[Link to source file]({file_source})")
+            # Créer un lien vers le fichier source si possible
+            # Notez que Streamlit utilise une URL relative pour afficher le lien
+            # dans l'application web
+            
+            # Construire un chemin relatif par rapport au répertoire de base
+            file_source_relative = os.path.relpath(file_source, start=BASE_DIR)
+            file_source_relative = 'dev_data/archive_Ca_MR/Compte-rendu CA Maison Rose 24 septembre 2024.pdf'
+            st.markdown(f"[Link to source file]({file_source_relative})")
         else:
+            # Affiche simplement la source sous forme de texte si le chemin est inconnu
             st.write(f"Source: {file_source}")
 
-                            # Afficher le contenu du chunk avec un bouton pour le développer
-        with st.expander(f"View content of this chunk from {file_source}"):
+        # Afficher le contenu du chunk avec un bouton pour le développer
+        with st.expander(f"View content the chunk at {file_source}"):
             st.write(doc.page_content)
 
 if __name__ == "__main__":
