@@ -10,7 +10,7 @@ from ollama_query import ollama_query # Fonction pour interroger Ollama
 
 # Configuration du logger
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
