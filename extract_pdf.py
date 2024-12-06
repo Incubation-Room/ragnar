@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def extract_creation_date(text_content, metadata):
+def extract_creation_date(text_content, metadata, attempt_inference=False):
     """
     Extracts and formats the creation date from the metadata.
 
@@ -33,7 +33,10 @@ def extract_creation_date(text_content, metadata):
             return creation_date.strftime("%Y-%m-%d")  # Format ISO8601
         except Exception as e:
             logger.error(f"Erreur lors de la conversion de la date de création : {e}")
-    return infer_creation_date(text_content, metadata["filepath"])
+    if attempt_inference:
+        return infer_creation_date(text_content, metadata["filepath"])
+    else:
+        return None
 
 def infer_creation_date(text_content, filepath):
     prompt = ("Je veux que tu essaie de trouver quelle est la date de création d'un fichier. "
