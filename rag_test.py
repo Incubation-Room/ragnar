@@ -1,3 +1,4 @@
+from datetime import datetime
 from rag_pipeline import (
     load_documents,
     split_documents,
@@ -55,15 +56,10 @@ def main():
     print(f"{sum(len(q) for q in questions_dict.values())} questions chargées avec succès.\n")
 
     # Demander le chemin des documents
-    source_path = input("Entrez le chemin du dossier contenant les documents : ").strip()
+    source_path = input("Entrez le chemin du dossier contenant les documents (laisser vide pour le chemin par défaut) : ").strip()
     if not source_path:
-        print("Le chemin ne peut pas être vide.")
-        return
-
-    source_path = normalize_path(source_path)
-    if not os.path.isdir(source_path):
-        print("Le chemin fourni n'est pas un dossier valide.")
-        return
+        source_path = '/Users/sebastienstagno/ICAM/Machine Learning/ragnar/dev_data'
+        print(f"Chemin par défaut utilisé : {source_path}")
 
     print(f"Chargement des documents depuis {source_path}...")
     documents = load_documents(source_path, is_directory=True)
@@ -89,15 +85,22 @@ def main():
     retriever, generate_answer = create_retrieval_qa_chain(vector_store)
     print("Chaîne de récupération et de génération de réponses prête.")
 
-    output_file = "test_results.txt"
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("=== Résultats des tests RAG ===\n\n")
-    print(f"Les résultats seront enregistrés dans '{output_file}'.\n")
+
+    # Générer un sous-dossier basé sur le timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    results_dir = os.path.join("results", f"run_{timestamp}")
+    os.makedirs(results_dir, exist_ok=True)  # Crée le dossier si nécessaire
 
     for header, questions in questions_dict.items():
-        print(f"\n# {header}")
-        with open(output_file, "a", encoding="utf-8") as f:
-            f.write(f"\n# {header}\n")
+        # Définir un fichier de sortie par section
+        sanitized_header = header.replace(" ", "_").replace("/", "_")  # Assurez-vous que le nom est compatible avec le système de fichiers
+        output_file = os.path.join(results_dir, f"results_{sanitized_header}_{timestamp}.txt")
+        print(f"\n=== Section : {header} ===")
+        print(f"Les résultats pour cette section seront enregistrés dans '{output_file}'.\n")
+
+        # Créer un fichier pour cette section
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(f"=== Résultats de la section : {header} ===\n\n")
 
         for i, question in enumerate(questions, 1):
             print(f"Question {i}: {question}")
@@ -112,6 +115,16 @@ def main():
                         f.write("Aucun document pertinent trouvé.\n\n")
                     continue
 
+                # Inclure les documents utilisés pour répondre
+                document_titles = [doc.metadata.get('title', 'Titre inconnu') for doc in context_docs]
+                document_dates = [doc.metadata.get('date', 'Date inconnue') for doc in context_docs]
+                document_info = "\n".join([f"- {title} ({date})" for title, date in zip(document_titles, document_dates)])
+
+                with open(output_file, "a", encoding="utf-8") as f:
+                    f.write("Documents utilisés :\n")
+                    f.write(f"{document_info}\n\n")
+
+                # Générer la réponse
                 context = "\n".join([doc.page_content for doc in context_docs])
                 answer = generate_answer(question, context)
                 print(f"Réponse : {answer}\n")
@@ -124,3 +137,6 @@ def main():
                     f.write(f"Erreur : {e}\n\n")
 
     print(f"Tests terminés. Résultats enregistrés dans '{output_file}'.")
+
+if __name__ == "__main__":
+    main()
