@@ -21,10 +21,10 @@ Fonctions principales :
 
 import os
 from pathlib import Path
-from rag_pipeline import (build_context_from_docs, normalize_path, load_documents, split_documents, 
+from rag_pipeline import (build_context_from_docs, normalize_path, load_documents, 
                           create_retrieval_qa_chain)
 
-from vector_store import create_vector_store
+from vector_store import create_vector_store, load_vector_store, vector_store_exists
 from chunking import split_documents
 
 def print_model_options():
@@ -115,25 +115,6 @@ def handle_documents(source_path, is_directory):
     return chunks
 
 
-def create_vector_store_from_chunks(chunks):
-    """
-    Crée la base vectorielle à partir des chunks donnés.
-    
-    Args:
-        chunks (list): La liste des chunks de documents.
-    
-    Returns:
-        object: La base vectorielle FAISS.
-    
-    Raises:
-        RuntimeError: Si la création de la base vectorielle échoue.
-    """
-    try:
-        return create_vector_store(chunks)
-    except RuntimeError as e:
-        raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS : {e}")
-
-
 def run_interactive_query(retriever, generate_answer):
     """
     Permet à l'utilisateur de poser des questions de manière interactive
@@ -182,11 +163,37 @@ def main():
     interroger le système RAG, et permettre de poser plusieurs questions.
     Permet de traiter un fichier unique ou un dossier.
     """
+
+    vector_store_path = ".vector_store"
+
+    # Vérification de l'existence du vector store
+    if vector_store_exists(vector_store_path):
+        print(f"Un vector store existant a été détecté à '{vector_store_path}'.")
+        use_existing = input("Souhaitez-vous le charger ? (o/n) : ").strip().lower()
+        
+        if use_existing == 'o':
+            try:
+                vector_store = load_vector_store(directory_path=vector_store_path)
+                print("Vector store chargé avec succès.\n")
+                
+                # Passer directement à l'interrogation
+                retriever, generate_answer = create_retrieval_qa_chain(vector_store)
+                run_interactive_query(retriever, generate_answer)
+                return
+
+            except RuntimeError as e:
+                print(f"Erreur lors du chargement du vector store : {e}")
+                return
+        else:
+            print("Création d'un nouveau vector store...\n")
+
     print_model_options()
 
     model_name = select_model()
     print(f"Modèle sélectionné : {model_name}\n")
     
+
+
     source_path = get_source_path()
 
     try:
@@ -202,7 +209,7 @@ def main():
         return
 
     try:
-        vector_store = create_vector_store_from_chunks(chunks)
+        vector_store = create_vector_store(chunks, model_name=model_name)
     except RuntimeError as e:
         print(e)
         return
