@@ -25,6 +25,7 @@ from rag_pipeline import (build_context_from_docs, normalize_path, load_document
                           create_retrieval_qa_chain)
 
 from vector_store import create_vector_store
+from chunking import split_documents
 
 def print_model_options():
     """
