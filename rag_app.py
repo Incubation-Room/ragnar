@@ -7,6 +7,7 @@ from rag_pipeline import (
     create_retrieval_qa_chain,
     get_initial_prompt,  # Import de la fonction pour gérer le contexte
 )
+from rag_test import load_questions_with_headers
 from vector_store import create_vector_store
 from chunking import split_documents
 from preprocessing import load_documents
@@ -19,12 +20,15 @@ class Document:
         self.metadata = metadata
 
 
+
 def main():
+
+
     #st.title("RAG System with Ollama")
     #st.write("Upload your files or provide a folder path containing your documents.")
-
-    st.markdown("<h1 style='text-align:center;'>⚔️ Valhalla des Données ⚔️</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;'>Déposez vos fichiers ou chargez la base des runes existantes.</p>", unsafe_allow_html=True)
+    st.image("Images\Banniere_ragnar.webp", use_container_width=True)
+    st.markdown("<h3 style='text-align:center;'>⚔️ Quand les tempêtes de données s’élèvent, RAGNAR reste à la barre ⚔️</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;'>Déposez vos parchemins ou chargez la base des runes existantes.</p>", unsafe_allow_html=True)
 
     # Initialisation des états pour gérer les documents et le chat
     if "documents" not in st.session_state:
@@ -42,15 +46,15 @@ def main():
 
     # Section pour glisser-déposer des fichiers
     uploaded_files = st.file_uploader(
-        "Drag and drop files here (or click to upload multiple files)",
-        type=["pdf"],
+        "Déposez vos parchemins ici (ou cliquez pour choisir)",
+        type=["pdf", "docx", "xlsx", "xls", "txt"],
         accept_multiple_files=True
     )
 
     # Dossier par défaut pour le chargement
     current_folder = Path(os.getcwd())  # Dossier courant
     default_folder = current_folder / "dev_data" / "archive_Ca_MR"
-    folder_path = st.text_input("Or enter the path to your target folder:", placeholder=str(default_folder))
+    folder_path = st.text_input("Ou entrer le chemin de votre répertoire mystique:", placeholder=str(default_folder))
 
     # Chemin de la base vectorielle
     save_path = ".vector_store"
@@ -62,10 +66,10 @@ def main():
     col1, col2 = st.columns(2)
 
     with col1:
-        analyze_clicked = st.button("Analyze")
+        analyze_clicked = st.button("⚒️ Forger la Base")
 
     with col2:
-        load_db_clicked = st.button("Load Existing DB", disabled=not existing_db_exists)
+        load_db_clicked = st.button("🔮 Invoquer la Base Existante", disabled=not existing_db_exists)
 
     # Barre de progression (cachée au départ)
     progress_placeholder = st.empty()
@@ -117,7 +121,7 @@ def main():
                 progress_placeholder.empty()
 
             except Exception as e:
-                st.error(f"An error occurred while creating the knowledge base: {e}")
+                st.error(f"Une erreur s'est produite lors de la création de nouvelles runes : {e}")
                 return
             finally:
                 progress_placeholder.empty()
@@ -141,26 +145,27 @@ def main():
                     time.sleep(0.05)
                 st.success("🌌 La base de données ancestrale est invoquée avec succès !")
             except Exception as e:
-                st.error(f"An error occurred while loading the existing database: {e}")
+                st.error(f"Une erreur s'est produite lors de l'invocation des runes existantes : {e}")
+            
             finally:
                 progress_placeholder.empty()
         else:
             st.warning("No existing database found.")
-
+                        
     # Interface de type chat (si la base vectorielle est prête)
     if st.session_state.vector_store:
-        st.write("You can now ask questions about your documents!")
+        st.markdown("### Posez votre question aux runes")
 
         # Ajouter un champ pour poser une question
         with st.form("chat_form", clear_on_submit=True):
-            user_input = st.text_input("Ask your question:")
-            submitted = st.form_submit_button("Send")
+            user_input = st.text_input("Posez votre question:")
+            submitted = st.form_submit_button("Envoyer")
 
             if submitted and user_input:
                 # Ajouter l'entrée utilisateur à l'historique
                 st.session_state.chat_history.append({"role": "user", "message": user_input})
 
-                with st.spinner("Fetching your answer..."):
+                with st.spinner("Les runes se consultent..."):
                     try:
                         # Requête au système RAG
                         retriever, generate_answer = create_retrieval_qa_chain(
@@ -175,18 +180,18 @@ def main():
                         st.session_state.chat_history.append({"role": "assistant", "message": answer})
 
                         # Afficher l'historique du chat
-                        st.subheader("Chat History")
+                        st.subheader("Historique des Sages Paroles")
                         for msg in st.session_state.chat_history:
                             if msg["role"] == "user":
                                 st.markdown(f"**You:** {msg['message']}")
                             else:
-                                st.markdown(f"**RAG System:** {msg['message']}")
+                                st.markdown(f"**RAGnar:** {msg['message']}")
 
                         # Afficher les documents sources
                         display_sources(context_docs)
 
                     except Exception as e:
-                        st.error(f"An error occurred during the query: {e}")
+                        st.error(f"Une erreur s'est produite lors de l'interrogation des runes: {e}")
 
 # Définir le répertoire de base pour les chemins relatifs (racine de votre projet)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -208,7 +213,7 @@ def display_sources(context_docs):
         - Affiche le contenu du chunk associé, avec la possibilité de l'étendre
           pour une visualisation détaillée.
     """
-    st.subheader("Source Documents")
+    st.subheader("Parchemins consultés")
     
     # Parcourir chaque document dans context_docs
     for doc in context_docs:

@@ -1,7 +1,6 @@
 from datetime import datetime
 from rag_pipeline import (
     load_documents,
-    split_documents,
     create_retrieval_qa_chain,
     normalize_path,
 )
