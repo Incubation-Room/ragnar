@@ -5,8 +5,31 @@ from rag_pipeline import (
     normalize_path,
 )
 from vector_store import create_vector_store
+from chunking import split_documents
 
 import os
+
+# # Critères d'évaluation
+# EVALUATION_CRITERIA = [
+#     "Précision : Pertinence des documents récupérés.",
+#     "Rappel : Exhaustivité des documents récupérés.",
+#     "F1-Score : Équilibre entre précision et rappel.",
+#     "Similarité Jaccard : Proximité des réponses générées avec les réponses attendues.",
+#     "BLEU Score : Qualité linguistique et sémantique des réponses générées.",
+#     "Taux d'hallucination : Proportion de réponses non ancrées dans les documents récupérés.",
+#     "Latence : Temps nécessaire pour fournir une réponse."
+# ]
+
+# # Initialisation des métriques d'évaluation
+# evaluation_metrics = {
+#     "precision": 0.0,
+#     "recall": 0.0,
+#     "f1_score": 0.0,
+#     "jaccard_similarity": 0.0,
+#     "bleu_score": 0.0,
+#     "hallucination_rate": 0.0,
+#     "latency": 0.0
+# }
 
 def load_questions_with_headers(file_path):
     """
@@ -90,6 +113,17 @@ def main():
     results_dir = os.path.join("results", f"run_{timestamp}")
     os.makedirs(results_dir, exist_ok=True)  # Crée le dossier si nécessaire
 
+    # # Créer le fichier d'évaluation
+    # evaluation_file = os.path.join(results_dir, f"evaluation_{timestamp}.txt")
+    # with open(evaluation_file, "w", encoding="utf-8") as f:
+    #     f.write(f"=== Évaluation des Résultats ===\n")
+    #     f.write(f"Test effectué le : {timestamp}\n\n")
+    #     f.write("Critères d'évaluation :\n")
+    #     for criterion in EVALUATION_CRITERIA:
+    #         f.write(f"- {criterion}\n")
+    #     f.write("\n=== Résultats ===\n")
+
+    # Création du fichier de résultats par section
     for header, questions in questions_dict.items():
         # Définir un fichier de sortie par section
         sanitized_header = header.replace(" ", "_").replace("/", "_")  # Assurez-vous que le nom est compatible avec le système de fichiers
@@ -101,12 +135,14 @@ def main():
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(f"=== Résultats de la section : {header} ===\n\n")
 
+        # Boucle à travers chaque question de la section
         for i, question in enumerate(questions, 1):
             print(f"Question {i}: {question}")
             with open(output_file, "a", encoding="utf-8") as f:
                 f.write(f"- Question {i}: {question}\n")
 
             try:
+                # Effectuer la recherche pour la question
                 context_docs = retriever.invoke(question)
                 if not context_docs:
                     print("Aucun document pertinent trouvé.\n")
@@ -123,19 +159,45 @@ def main():
                     f.write("Documents utilisés :\n")
                     f.write(f"{document_info}\n\n")
 
-                # Générer la réponse
+                # Générer la réponse à partir des documents contextuels
                 context = "\n".join([doc.page_content for doc in context_docs])
                 answer = generate_answer(question, context)
                 print(f"Réponse : {answer}\n")
                 with open(output_file, "a", encoding="utf-8") as f:
                     f.write(f"Réponse : {answer}\n\n")
 
+                # # Simuler le calcul des métriques pour cette réponse
+                # evaluation_metrics["precision"] = 0.85  # Exemple, remplacez par vos calculs réels
+                # evaluation_metrics["recall"] = 0.90
+                # evaluation_metrics["f1_score"] = (2 * evaluation_metrics["precision"] * evaluation_metrics["recall"]) / (
+                #     evaluation_metrics["precision"] + evaluation_metrics["recall"]
+                # )
+                # evaluation_metrics["jaccard_similarity"] = 0.78  # Exemple
+                # evaluation_metrics["bleu_score"] = 0.65  # Exemple
+                # evaluation_metrics["hallucination_rate"] = 0.10  # Exemple
+                # evaluation_metrics["latency"] = 1.2  # Temps en secondes, exemple
+
+                # # Enregistrer les résultats des métriques dans le fichier d'évaluation
+                # with open(evaluation_file, "a", encoding="utf-8") as eval_f:
+                #     eval_f.write(f"\nQuestion : {question}\n")
+                #     eval_f.write("Métriques d'évaluation :\n")
+                #     for metric, value in evaluation_metrics.items():
+                #         eval_f.write(f"  - {metric.capitalize().replace('_', ' ')} : {value}\n")
+
             except Exception as e:
                 print(f"Erreur : {e}\n")
                 with open(output_file, "a", encoding="utf-8") as f:
                     f.write(f"Erreur : {e}\n\n")
 
-    print(f"Tests terminés. Résultats enregistrés dans '{output_file}'.")
+        print(f"Les résultats pour la section '{header}' ont été enregistrés dans '{output_file}'.\n")
+
+    #     # Synthèse globale des résultats
+    # with open(evaluation_file, "a", encoding="utf-8") as f:
+    #     f.write("\n=== Synthèse Globale ===\n")
+    #     f.write("Les métriques d'évaluation sont calculées pour chaque question.\n")
+    #     f.write("Veuillez examiner les résultats détaillés pour plus d'informations.\n")
+
+    print(f"Tests terminés. Résultats enregistrés dans '{results_dir}'.")
 
 if __name__ == "__main__":
     main()
