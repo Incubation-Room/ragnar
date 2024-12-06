@@ -122,6 +122,7 @@ rpds-py
 safetensors
 scikit-learn
 scipy
+semantic-chunkers
 sentence-transformers
 setuptools
 simplejson
