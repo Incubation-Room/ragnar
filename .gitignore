@@ -2,3 +2,8 @@
 .venv/*
 dev_data
 *.pyc
+.vector_store
+.vscode
+Docs_references
+results
+.DS_Store
