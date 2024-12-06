@@ -1,10 +1,10 @@
 from datetime import datetime
 from rag_pipeline import (
-    load_documents,
     create_retrieval_qa_chain,
     normalize_path,
 )
 from vector_store import create_vector_store
+from preprocessing import load_documents
 from chunking import split_documents
 
 import os
