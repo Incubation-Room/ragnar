@@ -4,12 +4,12 @@ import streamlit as st
 from rag_pipeline import (
     build_context_from_docs,
     normalize_path,
-    load_documents,
     create_retrieval_qa_chain,
     get_initial_prompt,  # Import de la fonction pour gérer le contexte
 )
 from vector_store import create_vector_store
 from chunking import split_documents
+from preprocessing import load_documents
 import time
 
 # Classe Document pour garantir la compatibilité avec split_documents
@@ -43,7 +43,7 @@ def main():
     # Section pour glisser-déposer des fichiers
     uploaded_files = st.file_uploader(
         "Drag and drop files here (or click to upload multiple files)",
-        type=["pdf", "docx", "xlsx", "xls", "txt"],
+        type=["pdf"],
         accept_multiple_files=True
     )
 

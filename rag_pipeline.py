@@ -1,6 +1,6 @@
 
-from langchain.schema import Document
-from extract_pdf import extract_content_from_pdf
+from preprocessing import extract_content_from_pdf
+from preprocessing import extract_content_from_txt
 import os
 
 from ollama_query import ollama_query # Fonction pour interroger Ollama
@@ -40,76 +40,6 @@ def normalize_path(path):
 #         self.page_content = page_content
 #         self.metadata = metadata
 
-
-def load_documents(source, is_directory=False):
-    """
-    Charge les documents PDF depuis un dossier ou un fichier unique.
-
-    Parameters:
-    - source (str | List[UploadedFile]): Chemin du dossier, chemin d'un fichier unique, ou liste de fichiers uploadés.
-    - is_directory (bool): Indique si `source` est un dossier.
-
-    Returns:
-    - List[Document]: Liste d'objets Document contenant le texte extrait et les métadonnées.
-    """
-    # Extensions supportées et leurs extracteurs associés
-    supported_extensions = {
-        "pdf": extract_content_from_pdf,
-    }
-
-    documents = []
-
-    if is_directory:
-        # Charger depuis un dossier
-        for root, _, files in os.walk(source):
-            for file_name in files:
-                file_path = os.path.join(root, file_name)
-                file_extension = file_name.split(".")[-1].lower()
-
-                if file_extension in supported_extensions:
-                    try:
-                        extractor = supported_extensions[file_extension]
-                        content = extractor(file_path)
-                        documents.append(
-                            Document(
-                                page_content=content["text"],
-                                metadata={
-                                    "source": file_path,
-                                    "title": content["metadata"].get("title", "Titre non défini"),
-                                    "date": content["metadata"].get("date", "Date non définie"),
-                                },
-                            )
-                        )
-                    except Exception as e:
-                        print(f"Erreur lors du traitement du fichier {file_path}: {e}")
-                else:
-                    print(f"Type de fichier non pris en charge : {file_path}")
-    else:
-        # Vérifiez si source est une chaîne (fichier unique)
-        if isinstance(source, str):
-            file_path = source
-            file_extension = file_path.split(".")[-1].lower()
-
-            if file_extension in supported_extensions:
-                try:
-                    extractor = supported_extensions[file_extension]
-                    content = extractor(file_path)
-                    documents.append(
-                        Document(
-                            page_content=content["text"],
-                            metadata={
-                                "source": file_path,
-                                "title": content["metadata"].get("title", "Titre non défini"),
-                                "date": content["metadata"].get("date", "Date non définie"),
-                            },
-                        )
-                    )
-                except Exception as e:
-                    print(f"Erreur lors du traitement du fichier {file_path}: {e}")
-            else:
-                print(f"Type de fichier non pris en charge : {file_path}")
-
-    return documents
 
 
 def determine_optimal_k(documents, question, max_k=20, min_k=3):
@@ -159,7 +89,7 @@ def build_context_from_docs(context_docs):
     Returns:
         str: A formatted string combining document metadata and content.
     """
-    return "\n".join(
+    return "\n\n".join(
         [
             f"Metadata: {doc.metadata}\nContent: {doc.page_content}" 
             for doc in context_docs
@@ -214,7 +144,7 @@ def create_retrieval_qa_chain(vector_store, initial_context=None, search_type="s
         prompt = f"""
         Voici les fichiers qui ont été retrouvés d'après la requête: {context}
         Utilise leur contenu pour répondre à cette question: {query}
-        Answer:
+        Réponse:
         """
         try:
             return ollama_query(prompt)

@@ -21,11 +21,12 @@ Fonctions principales :
 
 import os
 from pathlib import Path
-from rag_pipeline import (build_context_from_docs, normalize_path, load_documents, 
+from rag_pipeline import (build_context_from_docs, normalize_path, 
                           create_retrieval_qa_chain)
 
 from vector_store import create_vector_store, load_vector_store, vector_store_exists
 from chunking import split_documents
+from preprocessing import load_documents
 
 def print_model_options():
     """
