@@ -1,12 +1,9 @@
 
 from langchain.schema import Document
-from langchain.prompts import PromptTemplate
-import numpy as np
 from extract_pdf import extract_content_from_pdf
 import os
 
 from ollama_query import ollama_query # Fonction pour interroger Ollama
-from chunking import split_documents
 
 # Définir le contexte initial
 DEFAULT_CONTEXT = """
@@ -113,9 +110,6 @@ def load_documents(source, is_directory=False):
                 print(f"Type de fichier non pris en charge : {file_path}")
 
     return documents
-
-
-
 
 
 def determine_optimal_k(documents, question, max_k=20, min_k=3):
