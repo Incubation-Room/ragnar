@@ -45,3 +45,35 @@ def split_documents(documents, chunk_size=500, chunk_overlap=50, semantic_chunki
         # Use default character-based splitting
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         return text_splitter.split_documents(documents)
+
+
+
+
+def main():
+    """
+    Fonction principale pour tester le chunking sur un fichier texte existant.
+    """
+    # Demander à l'utilisateur d'entrer le chemin d'un fichier texte
+    file_path = "dev_data/archive_Ca_MR/compte rendu CA 29 08 24.pdf"
+    from rag_pipeline import load_documents
+    try:
+        # Charger le fichier en tant que Document
+        documents = load_documents(file_path)
+        print(f"\nFichier chargé avec succès : {documents[0].metadata['source']}")
+        
+        # Tester le chunking
+        chunks = split_documents(documents, semantic_chunking=True)
+        
+        # Afficher les résultats
+        print(f"\nNombre de chunks générés : {len(chunks)}")
+        for i, chunk in enumerate(chunks, start=1):
+            print(f"--- Chunk {i} ---")
+            print(chunk.page_content)
+            print(f"Métadonnées : {chunk.metadata}\n")
+    
+    except Exception as e:
+        print(f"Une erreur s'est produite : {e}")
+
+
+if __name__ == "__main__":
+    main()
