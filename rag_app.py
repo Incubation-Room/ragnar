@@ -11,15 +11,21 @@ from rag_pipeline import (
 )
 from vector_store import create_vector_store
 from chunking import split_documents
+import time
+
 # Classe Document pour garantir la compatibilité avec split_documents
 class Document:
     def __init__(self, page_content, metadata):
         self.page_content = page_content
         self.metadata = metadata
 
+
 def main():
-    st.title("RAG System with Ollama")
-    st.write("Upload your files or provide a folder path containing your documents.")
+    #st.title("RAG System with Ollama")
+    #st.write("Upload your files or provide a folder path containing your documents.")
+
+    st.markdown("<h1 style='text-align:center;'>⚔️ Valhalla des Données ⚔️</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;'>Déposez vos fichiers ou chargez la base des runes existantes.</p>", unsafe_allow_html=True)
 
     # Initialisation des états pour gérer les documents et le chat
     if "documents" not in st.session_state:
@@ -41,17 +47,33 @@ def main():
         type=["pdf", "docx", "xlsx", "xls", "txt"],
         accept_multiple_files=True
     )
-    
-    # Get the directory where the Streamlit app is being run
-    current_folder = Path(os.getcwd())  # This will be the current directory
-    default_folder = current_folder / "dev_data" / "archive_Ca_MR"
-    # Use the default folder for the folder path input
-    folder_path = st.text_input("Or enter the path to your target folder:", placeholder=default_folder)
 
-    # Bouton pour lancer l’analyse
-    if st.button("Analyze"):
+    # Dossier par défaut pour le chargement
+    current_folder = Path(os.getcwd())  # Dossier courant
+    default_folder = current_folder / "dev_data" / "archive_Ca_MR"
+    folder_path = st.text_input("Or enter the path to your target folder:", placeholder=str(default_folder))
+
+    # Chemin de la base vectorielle
+    save_path = ".vector_store"
+
+    # Bouton pour charger une base déjà existante
+    # On vérifie d'abord si une base vectorielle existe déjà
+    existing_db_exists = os.path.exists(save_path)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        analyze_clicked = st.button("Analyze")
+
+    with col2:
+        load_db_clicked = st.button("Load Existing DB", disabled=not existing_db_exists)
+
+    # Barre de progression (cachée au départ)
+    progress_placeholder = st.empty()
+    # Logique du bouton "Analyze"
+    if analyze_clicked:
         if not uploaded_files and not folder_path:
-            folder_path= str(default_folder)
+            folder_path = str(default_folder)
 
         # Normaliser le chemin si défini
         if folder_path:
@@ -62,11 +84,19 @@ def main():
         # Charger les documents via rag_pipeline
         if uploaded_files or folder_path:
             try:
+                  # On affiche une barre de progression
+                with progress_placeholder.container():
+                    st.markdown("### 🛠️ Forge en cours...")
+                    progress_bar = st.progress(0)
+
+                # Charger les documents
                 documents = load_documents(
                     uploaded_files if uploaded_files else folder_path,
                     is_directory=bool(folder_path),
                 )
                 st.session_state.documents = documents
+                progress_bar.progress(30)
+
             except Exception as e:
                 st.error(f"An error occurred while processing the files: {e}")
                 return
@@ -77,15 +107,46 @@ def main():
         else:
             # Diviser les documents en chunks
             chunks = split_documents(st.session_state.documents)
+            progress_bar.progress(60)
 
             # Créer la base vectorielle
             try:
-                vector_store = create_vector_store(chunks)
+                vector_store = create_vector_store(chunks, save_path=save_path)
                 st.session_state.vector_store = vector_store
-                st.success("Knowledge base created! You can now start querying.")
+                progress_bar.progress(100)
+                st.success("⚡ Les runes ont été gravées dans la pierre ! La base des connaissances est prête.")
+                progress_placeholder.empty()
+
             except Exception as e:
                 st.error(f"An error occurred while creating the knowledge base: {e}")
                 return
+            finally:
+                progress_placeholder.empty()
+
+    # Logique du bouton "Load Existing DB"
+    if load_db_clicked:
+        if existing_db_exists:
+            with progress_placeholder.container():
+                st.markdown("### 🔮 Invocation en cours...")
+                progress_bar = st.progress(0)
+            try:
+ 
+                # Appel à create_vector_store sans chunks ne sert pas à créer
+                # mais à charger la base existante (selon la logique existante).
+                # Pour cela, on peut lui passer une liste vide ou None.
+                chunks = []
+                vector_store = create_vector_store(chunks, save_path=save_path)
+                st.session_state.vector_store = vector_store
+                for i in range(1, 101, 10):
+                    progress_bar.progress(i)
+                    time.sleep(0.05)
+                st.success("🌌 La base de données ancestrale est invoquée avec succès !")
+            except Exception as e:
+                st.error(f"An error occurred while loading the existing database: {e}")
+            finally:
+                progress_placeholder.empty()
+        else:
+            st.warning("No existing database found.")
 
     # Interface de type chat (si la base vectorielle est prête)
     if st.session_state.vector_store:
@@ -105,7 +166,7 @@ def main():
                         # Requête au système RAG
                         retriever, generate_answer = create_retrieval_qa_chain(
                             st.session_state.vector_store,
-                            initial_context=context,  # Passer le contexte fixe ici
+                            initial_context=context,
                         )
                         context_docs = retriever.invoke(user_input)
                         context_retrieved = build_context_from_docs(context_docs)
@@ -125,11 +186,8 @@ def main():
                         # Afficher les documents sources
                         display_sources(context_docs)
 
-
                     except Exception as e:
                         st.error(f"An error occurred during the query: {e}")
-
-
 
 # Définir le répertoire de base pour les chemins relatifs (racine de votre projet)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
