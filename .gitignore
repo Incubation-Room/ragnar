@@ -5,3 +5,5 @@ dev_data
 .vector_store
 .vscode
 Docs_references
+results
+.DS_Store
