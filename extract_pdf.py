@@ -5,12 +5,53 @@ import pytesseract
 from PIL import Image
 import fitz  # PyMuPDF
 
+
+from ollama_query import ollama_query # Fonction pour interroger Ollama
+
 # Configuration du logger
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+def extract_creation_date(text_content, metadata):
+    """
+    Extracts and formats the creation date from the metadata.
+
+    Parameters:
+        metadata (dict): A dictionary containing the metadata of the document.
+
+    Returns:
+        str: The formatted creation date in ISO8601 format (YYYY-MM-DD),
+             or None if the date is not available or invalid.
+    """
+    creation_date = metadata.get("creationDate", None)
+    if creation_date:
+        try:
+            creation_date = fitz.Document.convert_date(creation_date)  # Conversion automatique de date
+            return creation_date.strftime("%Y-%m-%d")  # Format ISO8601
+        except Exception as e:
+            logger.error(f"Erreur lors de la conversion de la date de création : {e}")
+    return infer_creation_date(text_content, metadata["filepath"])
+
+def infer_creation_date(text_content, filepath):
+    prompt = ("Je veux que tu essaie de trouver quelle est la date de création d'un fichier. "
+              "Il est possible que le document n'ait pas assez d'informations pour déduire une date. "
+              "Dans ce cas, une réponse moins précise est acceptable. "
+              "Je vais te donner le chemin complet du fichier et la première page du contenu. "
+              "Tu donneras seulement la date, au niveau de précision que tu as pu déterminer, ou 'date inconnue'"
+              "si tu n'as pas pu déduire la date de création. "
+              "Garde ta réponse aussi courte que possible, sans détailler le raisonnement. "
+              "Priviliégie le format ISO 8601 si la date exacte est connue.")
+    full_prompt = f"""{prompt}
+        Chemin du fichier : {filepath}
+        Première page : {text_content}
+        Réponse:"""
+    logger.debug(full_prompt)
+    inferred_date = ollama_query(prompt=full_prompt)
+    logger.debug(inferred_date)
+    return inferred_date
 
 
 def extract_content_from_pdf(file_path):
@@ -41,16 +82,12 @@ def extract_content_from_pdf(file_path):
 
         # Extraire les métadonnées générales
         metadata = doc.metadata or {}
+        metadata["filepath"] = file_path
         content["metadata"] = metadata
 
-        # Tenter d'extraire le titre et la date depuis les métadonnées
-
-        creation_date = metadata.get("creationDate", None)
-
-        # Formater la date si elle est présente dans les métadonnées
-        if creation_date:
-            creation_date = fitz.Document.convert_date(creation_date)  # Conversion automatique de date
-            creation_date = creation_date.strftime("%Y-%m-%d")  # Format ISO8601
+        # Extraire et formater la date de création
+        page_1 = doc[0].get_text()
+        creation_date = extract_creation_date(page_1, metadata)
 
         # Ajout des valeurs calculées aux métadonnées
         content["metadata"]["title"] = extract_title(text_content, metadata)
@@ -78,6 +115,7 @@ def extract_content_from_pdf(file_path):
 
     logger.info(f"Métadonnées extraites : {content['metadata']}")
     return content
+
 
 
 def extract_title(text_content, metadata):
