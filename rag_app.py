@@ -6,10 +6,10 @@ from rag_pipeline import (
     normalize_path,
     load_documents,
     split_documents,
-    create_vector_store,
     create_retrieval_qa_chain,
     get_initial_prompt,  # Import de la fonction pour gérer le contexte
 )
+from vector_store import create_vector_store
 # Classe Document pour garantir la compatibilité avec split_documents
 class Document:
     def __init__(self, page_content, metadata):

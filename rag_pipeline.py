@@ -1,18 +1,12 @@
-from langchain_community.vectorstores import FAISS
-from langchain_community.docstore.in_memory import InMemoryDocstore
-from langchain_huggingface import HuggingFaceEmbeddings
+
 from langchain.schema import Document
-import faiss
-from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 import numpy as np
 from extract_pdf import extract_content_from_pdf
 import os
-import io
 
 from ollama_query import ollama_query # Fonction pour interroger Ollama
-
 
 
 # Définir le contexte initial
@@ -143,62 +137,6 @@ def split_documents(documents, chunk_size=500, chunk_overlap=50):
     except Exception as e:
         raise RuntimeError(f"Erreur lors de la division des documents : {e}")
 
-
-def create_vector_store(chunks, model_name="all-MiniLM-L6-v2"):
-    """
-    Crée une base vectorielle FAISS en utilisant HuggingFaceEmbeddings.
-
-    Parameters:
-    - chunks (List[Document]): Liste des segments de documents, chaque segment ayant un attribut `page_content`.
-    - model_name (str): Modèle de sentence embeddings à utiliser (par défaut : "all-MiniLM-L6-v2").
-
-    Returns:
-    - FAISS: Une base vectorielle prête à l'emploi pour la récupération d'information.
-    """
-    try:
-        # Créer une fonction d'embedding compatible
-        embedding_function = HuggingFaceEmbeddings(model_name=model_name)
-
-        # Filtrer les documents valides (non vides)
-        valid_chunks = [chunk for chunk in chunks if chunk.page_content.strip()]
-        if not valid_chunks:
-            raise ValueError("Aucun document valide trouvé après filtrage.")
-
-        # Extraire le contenu des segments pour les embeddings
-        texts = [chunk.page_content for chunk in valid_chunks]
-
-        # Générer les embeddings et les convertir en tableau NumPy
-        embeddings = np.array(embedding_function.embed_documents(texts))
-
-        # Vérifier que le nombre d'embeddings correspond au nombre de documents valides
-        if len(embeddings) != len(valid_chunks):
-            raise ValueError("Le nombre d'embeddings ne correspond pas au nombre de documents valides.")
-
-        # Créer un index FAISS
-        dimension = embeddings.shape[1]  # Déduire la dimension des embeddings
-        index = faiss.IndexFlatL2(dimension)  # Index avec la distance L2
-        index.add(embeddings)  # Ajouter les embeddings à l'index
-
-        # Associer l'index à un docstore en mémoire
-        docstore = InMemoryDocstore({str(i): chunk for i, chunk in enumerate(valid_chunks)})
-        index_to_docstore_id = {i: str(i) for i in range(len(valid_chunks))}
-
-        # Vérifiez la synchronisation entre le docstore et FAISS
-        for i in range(len(valid_chunks)):
-            if index_to_docstore_id[i] not in docstore._dict:
-                raise ValueError(f"Problème de synchronisation : ID {i} non trouvé dans le docstore.")
-
-        # Construire la base vectorielle FAISS
-        vector_store = FAISS(
-            index=index,
-            docstore=docstore,
-            index_to_docstore_id=index_to_docstore_id,
-            embedding_function=embedding_function,
-        )
-        
-        return vector_store
-    except Exception as e:
-        raise RuntimeError(f"Erreur lors de la création de la base vectorielle FAISS : {e}")
 
 def determine_optimal_k(documents, question, max_k=20, min_k=3):
     """
