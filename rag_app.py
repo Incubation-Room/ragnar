@@ -5,7 +5,6 @@ from rag_pipeline import (
     build_context_from_docs,
     normalize_path,
     load_documents,
-    split_documents,
     create_retrieval_qa_chain,
     get_initial_prompt,  # Import de la fonction pour gérer le contexte
 )
