@@ -26,7 +26,8 @@ def main():
 
     #st.title("RAG System with Ollama")
     #st.write("Upload your files or provide a folder path containing your documents.")
-    st.image("Images\Banniere_ragnar.webp", use_container_width=True)
+    banner_path = str(Path('Images') / "Banniere_ragnar.webp")
+    st.image(banner_path, use_container_width=True)
     st.markdown("<h3 style='text-align:center;'>⚔️ Quand les tempêtes de données s’élèvent, RAGNAR reste à la barre ⚔️</h3>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;'>Déposez vos parchemins ou chargez la base des runes existantes.</p>", unsafe_allow_html=True)
 
