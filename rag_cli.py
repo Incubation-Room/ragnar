@@ -21,7 +21,10 @@ Fonctions principales :
 
 import os
 from pathlib import Path
-from rag_pipeline import build_context_from_docs, normalize_path, load_documents, split_documents, create_retrieval_qa_chain, create_vector_store
+from rag_pipeline import (build_context_from_docs, normalize_path, load_documents, split_documents, 
+                          create_retrieval_qa_chain)
+
+from vector_store import create_vector_store
 
 def print_model_options():
     """
