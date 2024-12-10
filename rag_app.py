@@ -25,9 +25,11 @@ class Document:
 def main():
     # Chargement du banner et titre
     banner_path = str(Path('Images') / "Banniere_ragnar.webp")
+    banner_rune_path = str(Path('Images') / "banniere_runes.png")
     st.image(banner_path, use_container_width=True)
-    st.markdown("<h3 style='text-align:center;'>⚔️ Quand les tempêtes de données s’élèvent, RAGNAR reste à la barre ⚔️</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;'>Déposez vos parchemins ou chargez la base des runes existantes.</p>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'>⚔️ Quand les tempêtes de données s’élèvent, RAGNAR reste à la barre ⚔️</h2>", unsafe_allow_html=True)
+    st.image(banner_rune_path, use_container_width=True)
+    st.markdown("### Déposez vos parchemins ou chargez la base des runes existantes.", unsafe_allow_html=True)
 
     # Initialisation des états
     if "documents" not in st.session_state:
@@ -46,6 +48,9 @@ def main():
     # Chargement des questions suggérées à partir d'un fichier fixe
     questions_file_path = "questions_test.txt"  # Adaptez si nécessaire
     questions_dict = load_questions_with_headers(questions_file_path)
+
+    
+    
 
     # Section d'upload et de saisie de chemin
     uploaded_files = st.file_uploader(
@@ -135,7 +140,9 @@ def main():
             st.warning("Pas de base de données ancestrale existantes")
 
     # Interface de chat
+    
     if st.session_state.vector_store:
+        st.image(banner_rune_path, use_container_width=True)
         st.markdown("### Posez votre question aux runes")
 
         # Rassembler toutes les questions du dictionnaire en une seule liste
@@ -144,7 +151,9 @@ def main():
             all_questions.extend(qlist)
 
         # Afficher un menu déroulant avec les questions type, optionnel
+        
         selected_question = st.selectbox("Ou choisissez une incantation rituelle :", [""] + all_questions)
+        st.image(banner_rune_path, use_container_width=True)
 
         with st.form("chat_form", clear_on_submit=True):
             user_input = st.text_input("Posez votre question:", value=selected_question if selected_question else "")
