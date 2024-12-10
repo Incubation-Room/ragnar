@@ -132,7 +132,7 @@ def main():
             finally:
                 progress_placeholder.empty()
         else:
-            st.warning("No existing database found.")
+            st.warning("Pas de base de données ancestrale existantes")
 
     # Interface de chat
     if st.session_state.vector_store:
@@ -166,11 +166,17 @@ def main():
                         st.session_state.chat_history.append({"role": "assistant", "message": answer})
 
                         st.subheader("Historique des Sages Paroles")
-                        for msg in reversed(st.session_state.chat_history):
-                            if msg["role"] == "user":
-                                st.markdown(f"**You:** {msg['message']}")
-                            else:
-                                st.markdown(f"**RAGnar:** {msg['message']}")
+                        history = st.session_state.chat_history
+                        # On part de la fin et on remonte par étapes de 2
+                        for i in range(len(history)-1, -1, -2):
+                            user_msg = history[i-1] if i-1 >= 0 else None
+                            assistant_msg = history[i]
+
+                            if user_msg and user_msg["role"] == "user":
+                                st.markdown(f"**You:** {user_msg['message']}")
+                            if assistant_msg and assistant_msg["role"] == "assistant":
+                                st.markdown(f"**RAGnar:** {assistant_msg['message']}")
+
 
 
                         display_sources(context_docs)
