@@ -55,10 +55,10 @@ def main():
     """
     # Demander à l'utilisateur d'entrer le chemin d'un fichier texte
     file_path = "dev_data/archive_Ca_MR/compte rendu CA 29 08 24.pdf"
-    from rag_pipeline import load_documents
+    from preprocessing import load_documents
     try:
         # Charger le fichier en tant que Document
-        documents = load_documents(file_path)
+        documents = load_documents([file_path])
         print(f"\nFichier chargé avec succès : {documents[0].metadata['source']}")
         
         # Tester le chunking

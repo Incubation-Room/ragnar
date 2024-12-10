@@ -8,7 +8,7 @@ from rag_pipeline import (
     get_initial_prompt,  # Import de la fonction pour gérer le contexte
 )
 from rag_test import load_questions_with_headers
-from vector_store import create_vector_store
+from vector_store import create_vector_store, load_vector_store
 from chunking import split_documents
 from preprocessing import load_documents
 import time
@@ -121,7 +121,7 @@ def main():
                 progress_bar = st.progress(0)
             try:
                 chunks = []
-                vector_store = create_vector_store(chunks, save_path=save_path)
+                vector_store = load_vector_store(directory_path=save_path)
                 st.session_state.vector_store = vector_store
                 for i in range(1, 101, 10):
                     progress_bar.progress(i)
@@ -208,7 +208,8 @@ def display_sources(context_docs):
     # Parcourir chaque document dans context_docs
     for doc in context_docs:
         # Récupérer le chemin de la source à partir des métadonnées
-        file_source = doc.metadata.get('source', 'Unknown source')
+        file_source = doc.metadata.get('source_path', 'Unknown source')
+        file_name = doc.metadata.get('source', 'Unknown source')
         # Construire un chemin relatif si possible
 
         # Vérifiez si la source contient un chemin de fichier et si le fichier existe
@@ -222,10 +223,10 @@ def display_sources(context_docs):
             st.markdown(f"[Link to source file]({file_source_relative})")
         else:
             # Affiche simplement la source sous forme de texte si le chemin est inconnu
-            st.write(f"Source: {file_source}")
+            st.write(f"Source: {file_name}")
 
         # Afficher le contenu du chunk avec un bouton pour le développer
-        with st.expander(f"View content the chunk at {file_source}"):
+        with st.expander(f"View content the chunk at {file_name}"):
             st.write(doc.page_content)
 
 if __name__ == "__main__":

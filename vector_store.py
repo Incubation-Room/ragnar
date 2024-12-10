@@ -106,11 +106,6 @@ def create_vector_store(chunks, model_name="all-MiniLM-L6-v2", save_path=".vecto
     """
     embedding_function = HuggingFaceEmbeddings(model_name=model_name)
 
-    # If the vector store exists, load it
-    if save_path and os.path.exists(save_path):
-        return load_vector_store(directory_path=save_path)
-
-    # Otherwise, create the vector store
     valid_chunks = [chunk for chunk in chunks if chunk.page_content.strip()]
     if not valid_chunks:
         raise ValueError("No valid documents found after filtering.")
