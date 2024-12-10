@@ -1,3 +1,8 @@
 .conda
 .vector_store
-dev_data
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
