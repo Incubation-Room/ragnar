@@ -14,6 +14,36 @@ from tqdm import tqdm
 import time
 import re
 
+def load_questions_with_headers(file_path):
+    """
+    Charge les questions à partir d'un fichier texte, en conservant les en-têtes.
+
+    Parameters:
+    - file_path (str): Chemin vers le fichier contenant les questions.
+
+    Returns:
+    - dict: Dictionnaire avec les en-têtes comme clés et une liste de questions comme valeurs.
+    """
+    questions_dict = {}
+    current_header = None
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#"):  # En-tête de section
+                    current_header = line.lstrip("#").strip()
+                    questions_dict[current_header] = []
+                elif line.startswith("-") and current_header:  # Question sous l'en-tête
+                    question = line.lstrip("-").strip()
+                    questions_dict[current_header].append(question)
+    except Exception as e:
+        print(f"Erreur lors du chargement des questions : {e}")
+    
+    return questions_dict
+
+
+
 def load_questions_from_yaml(yaml_file):
     """
     Charge les questions et les réponses attendues depuis un fichier YAML.
@@ -35,31 +65,6 @@ def load_questions_from_yaml(yaml_file):
     
     return questions
 
-
-def evaluate_answer_by_llama(question, answer):
-    """
-    Demande à Llama d'auto-évaluer sa réponse générée.
-    
-    :param question: La question posée
-    :param answer: La réponse générée
-    :return: La note d'évaluation sur une échelle de 1 à 20 et l'explication.
-    """
-    prompt = f"""
-    Voici la réponse générée à la question suivante : {question}
-    La réponse générée est : {answer}
-
-    Comment évalues-tu cette réponse sur une échelle de 1 à 20, où :
-    - 1 signifie 'très insuffisante' (très incomplète ou incorrecte)
-    - 20 signifie 'très pertinente' (très complète et précise)
-    
-    Utilise des critères comme la pertinence, la complétude et la clarté pour évaluer cette réponse.
-
-    Fournis ta réponse sous la forme suivante :
-    - Note : [nombre entre 1 et 20]
-    - Explication : [une explication détaillée de ta note]
-    """
-
-    evaluation = ollama_query(prompt)
     
 def evaluate_answer_by_llama(question, answer):
     """
