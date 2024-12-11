@@ -19,7 +19,8 @@ def ollama_query(prompt, model="llama3.2", api_url="http://localhost:11434/api/g
     }
     data = {
         "model": model,
-        "prompt": prompt
+        "prompt": prompt,
+        "options": {"temperature": 0}
     }
     try:
         response = requests.post(api_url, json=data, headers=headers)
